@@ -1,0 +1,18 @@
+
+To execute a Google Drive script to extract .svg files from a Google Slides project using a local Python script, you can use the Google Drive API and Google Slides API. Here are the steps you can follow:
+
+Set up a Google Cloud project and enable the necessary APIs:
+
+Go to the Google Cloud Console.
+Create a new project or select an existing one.
+Enable the Google Drive API and Google Slides API for your project.
+Create OAuth 2.0 credentials:
+
+In the Google Cloud Console, navigate to "APIs & Services" > "Credentials."
+Click on "Create Credentials" and select "OAuth client ID."
+Choose the application type that suits your needs (e.g., Desktop App).
+Configure the consent screen with the necessary information.
+Download the JSON file containing your client ID and client secret.
+
+Also remember to enable google slides: https://console.developers.google.com/apis/api/slides.googleapis.com/overview?project=595174965649
+Enable scripts: https://console.developers.google.com/apis/api/script.googleapis.com/overview?project=595174965649

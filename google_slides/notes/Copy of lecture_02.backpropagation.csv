@@ -1,0 +1,1351 @@
+slide_num,content,style
+0,Today’s ,"{'fontSize': {'magnitude': 14, 'unit': 'PT'}}"
+0,lecture,"{'foregroundColor': {'opaqueColor': {'rgbColor': {'red': 0.78431374, 'green': 0.14509805, 'blue': 0.023529412}}}, 'fontSize': {'magnitude': 14, 'unit': 'PT'}}"
+0, will be entirely devoted to the backpropagation algorithm. The heart of all deep learning. ,"{'fontSize': {'magnitude': 14, 'unit': 'PT'}}"
+0,"
+",{}
+1,For this lecture we’ll assume you’re familiar with these three basic concepts. ,"{'fontSize': {'magnitude': 14, 'unit': 'PT'}}"
+1,"
+",{}
+1,A ,"{'fontSize': {'magnitude': 14, 'unit': 'PT'}}"
+1,neural network,{'bold': True}
+1, is a graphical way of representing a computation that is controlled by ,"{'fontSize': {'magnitude': 14, 'unit': 'PT'}}"
+1,weights,{'italic': True}
+1, or ,"{'fontSize': {'magnitude': 14, 'unit': 'PT'}}"
+1,parameters,{'italic': True}
+1,". Choosing these weights on the basis of data, is how we learn to tune the behavior of the neural network.","{'fontSize': {'magnitude': 14, 'unit': 'PT'}}"
+1,"
+",{}
+1,The ,"{'fontSize': {'magnitude': 14, 'unit': 'PT'}}"
+1,loss,{'bold': True}
+1," of a neural network is a number that indicates how badly it performs on a particular example or set fo examples. In learning we want to choose the weights to make the loss as small as we can. To do this, we usually work out the","{'fontSize': {'magnitude': 14, 'unit': 'PT'}}"
+1, gradient of the loss with respect to the weights,{'bold': True}
+1,. This is a vector that gives us the direction in weight space in which the loss increases the quickest. Taking small steps in the opposite direction leads us to a network witjh  smaller and smaller loss.,"{'fontSize': {'magnitude': 14, 'unit': 'PT'}}"
+1,"
+",{}
+1,"For simple functions, it’s easy to work out the gradient by hand, and implement it as a simple function. For more complex models, this is no longer feasible. Backpropagation is a method that allows us to break the problem in to smaller problems. It lets us work out the gradient of a large and complicated function by a combination of symbolic and numeric computation.","{'fontSize': {'magnitude': 14, 'unit': 'PT'}}"
+1,"
+",{}
+1,"The backpropagation algorithm is at the heart of all deep learning. There is no understanding deep learning without understanding backpropagation, so this is an important lecture to follow. If the above makes no sense, I recommend following some of the suggested reading on canvas to brush up on the preliminaries.","{'fontSize': {'magnitude': 14, 'unit': 'PT'}}"
+1,"
+",{}
+1,"
+","{'fontSize': {'magnitude': 14, 'unit': 'PT'}}"
+2,In ,"{'fontSize': {'magnitude': 14, 'unit': 'PT'}}"
+2,the first part,"{'foregroundColor': {'opaqueColor': {'rgbColor': {'green': 0.42745098, 'blue': 0.64705884}}}, 'bold': True}"
+2,", we will review the basics of neural networks, and describe backpropagation in a scalar setting. That is, we will treat each individual element as a single number, and simply loop over all these numbers to do backpropagation over the whole network. This simplifies the derivation, but it is ultimately a slow algorithm with a complicated notation.","{'fontSize': {'magnitude': 14, 'unit': 'PT'}}"
+2,"
+",{}
+2,"
+","{'fontSize': {'magnitude': 14, 'unit': 'PT'}}"
+2,In ,"{'fontSize': {'magnitude': 14, 'unit': 'PT'}}"
+2,the second part,"{'foregroundColor': {'opaqueColor': {'rgbColor': {'green': 0.42745098, 'blue': 0.64705884}}}, 'bold': True}"
+2,", we translate neural networks to operations on vectors, matrices and tensors (the higher-dimensional analogue of a matrix). This allows us to simplify our notation, and more importantly, massively speed up the computation of neural networks. Backpropagation on tensors is a little more difficult to do than backpropagation on scalars.","{'fontSize': {'magnitude': 14, 'unit': 'PT'}}"
+2,"
+",{}
+2,"
+","{'fontSize': {'magnitude': 14, 'unit': 'PT'}}"
+2,In ,"{'fontSize': {'magnitude': 14, 'unit': 'PT'}}"
+2,the third part,"{'foregroundColor': {'opaqueColor': {'rgbColor': {'green': 0.42745098, 'blue': 0.64705884}}}, 'bold': True}"
+2,", we will make the final leap from manually worked out and implemented backpropagation system to  full-fledged automatic differentiation: we will show you how to build a system that take care of the gradient computation entirely by itself. This is the technology behind software like pytorch and tensorflow.","{'fontSize': {'magnitude': 14, 'unit': 'PT'}}"
+2,"
+",{}
+4,We’ll start with a quick recap of the basic principles behind neural networks. The name neural network is a bit of a historical artifact.,"{'fontSize': {'magnitude': 14, 'unit': 'PT'}}"
+4,"
+",{}
+4,"
+","{'fontSize': {'magnitude': 14, 'unit': 'PT'}}"
+4,"In the very early days of AI (the late 1950s), researchers decided to take a simple approach to AI. They started with a single brain cell: a neuron. A neuron receives multiple different signals from other cells through connections called ","{'fontSize': {'magnitude': 14, 'unit': 'PT'}}"
+4,dendrites,{'bold': True}
+4,". It processes these in a relatively simple way, deriving a single new signal, which it sends out through its single ","{'fontSize': {'magnitude': 14, 'unit': 'PT'}}"
+4,axon,{'bold': True}
+4,. The axon branches out so that the single signal can reach other cells.,"{'fontSize': {'magnitude': 14, 'unit': 'PT'}}"
+4,"
+",{}
+4,"
+","{'fontSize': {'magnitude': 14, 'unit': 'PT'}}"
+4,image source: ,"{'fontSize': {'magnitude': 14, 'unit': 'PT'}}"
+4,http://www.sciencealert.com/scientists-build-an-artificial-neuron-that-fully-mimics-a-human-brain-cell,"{'foregroundColor': {'opaqueColor': {'rgbColor': {'red': 0.011764706, 'green': 0.39607844, 'blue': 0.7529412}}}, 'bold': True, 'link': {'url': 'http://www.sciencealert.com/scientists-build-an-artificial-neuron-that-fully-mimics-a-human-brain-cell'}, 'underline': True}"
+4,"
+",{}
+4,"
+","{'foregroundColor': {'opaqueColor': {'rgbColor': {'red': 0.011764706, 'green': 0.39607844, 'blue': 0.7529412}}}, 'bold': True, 'link': {'url': 'http://www.sciencealert.com/scientists-build-an-artificial-neuron-that-fully-mimics-a-human-brain-cell'}, 'underline': True}"
+5,"This principles needed to be radically simplified to work with computers of that age, but doing so yielded one of the first successful machine learning systems: the perceptron (also seen in the ","{'bold': False, 'fontFamily': 'Cambria', 'fontSize': {'magnitude': 14, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Cambria', 'weight': 400}}"
+5,video,"{'foregroundColor': {'opaqueColor': {'rgbColor': {'red': 0.011764706, 'green': 0.39607844, 'blue': 0.7529412}}}, 'bold': True, 'link': {'url': 'https://www.youtube.com/watch?v=cNxadbrN_aI'}, 'underline': True}"
+5, in the first lecture). ,"{'bold': False, 'fontFamily': 'Cambria', 'fontSize': {'magnitude': 14, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Cambria', 'weight': 400}}"
+5,"
+",{}
+5,"The perceptron had a number of inputs (the features in modern parlance), each of which was multiplied by a ","{'bold': False, 'fontFamily': 'Cambria', 'fontSize': {'magnitude': 14, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Cambria', 'weight': 400}}"
+5,weight,"{'foregroundColor': {'opaqueColor': {'rgbColor': {'red': 0.87058824, 'green': 0.41568628, 'blue': 0.0627451}}}}"
+5,". These result was summed, together with a ","{'bold': False, 'fontFamily': 'Cambria', 'fontSize': {'magnitude': 14, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Cambria', 'weight': 400}}"
+5,bias,"{'foregroundColor': {'opaqueColor': {'rgbColor': {'red': 0.011764706, 'green': 0.39607844, 'blue': 0.7529412}}}}"
+5," parameter, and the sign of this result was used for sclassification or regression.","{'bold': False, 'fontFamily': 'Cambria', 'fontSize': {'magnitude': 14, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Cambria', 'weight': 400}}"
+5,"
+",{}
+5,Note that the ,"{'bold': False, 'fontFamily': 'Cambria', 'fontSize': {'magnitude': 14, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Cambria', 'weight': 400}}"
+5,intercept,"{'foregroundColor': {'opaqueColor': {'rgbColor': {'red': 0.011764706, 'green': 0.39607844, 'blue': 0.7529412}}}}"
+5, can be represented as just another input that we just fix to always be 1. This is called a ,"{'bold': False, 'fontFamily': 'Cambria', 'fontSize': {'magnitude': 14, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Cambria', 'weight': 400}}"
+5,bias node,{'bold': True}
+5,.,"{'bold': False, 'fontFamily': 'Cambria', 'fontSize': {'magnitude': 14, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Cambria', 'weight': 400}}"
+5,"
+",{}
+5,"
+","{'bold': False, 'fontFamily': 'Cambria', 'fontSize': {'magnitude': 14, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Cambria', 'weight': 400}}"
+5,"Of course, there is nothing new here: this is just a basic linear regression or linear classification model. The real power of the brain is in chaining multiple neurons together in a network.","{'bold': False, 'fontFamily': 'Cambria', 'fontSize': {'magnitude': 14, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Cambria', 'weight': 400}}"
+5,"
+",{}
+6,This is where the perceptron turns out to be too simple an abstraction. Because composing perceptrons (making the output of one perceptron the input of another) doesn’t make it more powerful. All you end out with is something that is equivalent to another linear model. We’re not creating models that can learning non-linear functions.,"{'fontSize': {'magnitude': 14, 'unit': 'PT'}}"
+6,"
+",{}
+6,"We’ve removed the bias node here for clarity, but that doesn’t affect our conclusions: any composition of affine functions is itself an affine function.","{'fontSize': {'magnitude': 14, 'unit': 'PT'}}"
+6,"
+",{}
+7,"The simplest solution is to apply a nonlinear function to each neuron, called the ","{'fontSize': {'magnitude': 14, 'unit': 'PT'}}"
+7,activation function.,{'bold': True}
+7, This is a scalar function we apply to the output of a perceptron after all the weighted inputs have been combined. ,"{'fontSize': {'magnitude': 14, 'unit': 'PT'}}"
+7,"
+",{}
+7,One popular option (especially in the early days) is the ,"{'fontSize': {'magnitude': 14, 'unit': 'PT'}}"
+7,logistic sigmoid,{'bold': True}
+7,", which we’ve seen already. Applying a sigmoid means that the sum of the inputs can range from negative infinity to positive infinity, but the output is always in the interval [0, 1].","{'fontSize': {'magnitude': 14, 'unit': 'PT'}}"
+7,"
+",{}
+7,"Another, more recent nonlinearity is the linear rectifier, or ReLU nonlinearity. This function just sets every negative input to zero, and keeps everything else the same.","{'fontSize': {'magnitude': 14, 'unit': 'PT'}}"
+7,"
+",{}
+7,Not using an activation function is also called using a linear activation.,"{'fontSize': {'magnitude': 14, 'unit': 'PT'}}"
+7,"
+",{}
+7,"We’ve seen one interpretation of the sigmoid function already: it turns every perceptron into a logistic classification unit. For now, we won’t look much more into the meaning of the nonlinearities: we know we need them to make a stack of neuron more expressive than a single neuron, and by trial and error, we’ve found a few that work well for us. ","{'fontSize': {'magnitude': 14, 'unit': 'PT'}}"
+7,"
+",{}
+9,"Using these nonlinearities, we can arrange single neutrons into ","{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+9,neural networks,{'bold': True}
+9,". Any arrangement makes a neural network, but for ease of training, this arrangement was the most popular for a long time. It’s called the ","{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+9,feedforward network ,{'bold': True}
+9,or ,"{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+9,multilayer perceptron,{'bold': True}
+9,". We arrange a layer of hidden units in the middle, each of which acts as a perceptron with a nonlinearity, connecting to all input nodes. Then we have one or more output nodes, connecting to all hidden layers. Crucially:","{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+9,"
+",{}
+9,"There are no cycles, the network feeds forward from input to output.","{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+9,"
+",{}
+9,"Nodes in the same layer are not connected to  each other, or to any other layer that the previous one.","{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+9,"
+",{}
+9,"Each layer is fully connected to the previous layer, every node in one layer connects to every node in the layer before it.","{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+9,"
+",{}
+9,"In the 80s and 90s they usually had just one hidden layer, because we hadn’t figured out how to train deeper networks.","{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+9,"
+",{}
+9,Every ,"{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+9,orange ,"{'foregroundColor': {'opaqueColor': {'rgbColor': {'red': 0.76862746, 'green': 0.46666667, 'blue': 0.21568628}}}}"
+9,and ,"{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+9,blue,"{'foregroundColor': {'opaqueColor': {'rgbColor': {'red': 0.24705882, 'green': 0.4, 'blue': 0.5882353}}}}"
+9, line in this picture represents one parameter of the model.,"{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+9,"
+",{}
+10,"If we want to train a regression model, we put non-linearities on the hidden nodes, and no activation on the output node. That way, the output can range from negative to positive infinity.","{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+10,"
+",{}
+10,"We can think of the first layer as learning some nonlinear transformation of the features, and the second layer as performing linear regression on the features.","{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+10,"
+",{}
+11,"If we have a classification problem with two classes (a binary classification problem), we can place a sigmoid activation on the output layer, so that the output is between 0 and 1. We can then interpret this as the probability that the input has the ","{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+11,positive,"{'foregroundColor': {'opaqueColor': {'themeColor': 'ACCENT2'}}, 'bold': True}"
+11, class.,"{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+11,"
+",{}
+11,"
+","{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+12,"For multi-class classification, we can use the ","{'bold': False, 'fontFamily': 'Cambria', 'fontSize': {'magnitude': 14, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Cambria', 'weight': 400}}"
+12,softmax activation,{'bold': True}
+12,". We create a single output node per class, and ensure that they sum to one. We can then interpret the output of the network as ","{'bold': False, 'fontFamily': 'Cambria', 'fontSize': {'magnitude': 14, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Cambria', 'weight': 400}}"
+12,class probabilities,{'bold': True}
+12,.,"{'bold': False, 'fontFamily': 'Cambria', 'fontSize': {'magnitude': 14, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Cambria', 'weight': 400}}"
+12,"
+",{}
+12,"
+","{'bold': False, 'fontFamily': 'Cambria', 'fontSize': {'magnitude': 14, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Cambria', 'weight': 400}}"
+12,"This activation is a little unusual in that it’s not strictly element-wise: to compute the value of one output node, it looks at the inputs of  all the other outputs nodes. To compute it we simply take the exponent of each output node (to ensure that they are all positive) and then divides each by the total (to ensure that they sum to one).","{'bold': False, 'fontFamily': 'Cambria', 'fontSize': {'magnitude': 14, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Cambria', 'weight': 400}}"
+12,"
+",{}
+12,"
+","{'bold': False, 'fontFamily': 'Cambria', 'fontSize': {'magnitude': 14, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Cambria', 'weight': 400}}"
+12,After the softmax we can interpret the output of node y,"{'bold': False, 'fontFamily': 'Cambria', 'fontSize': {'magnitude': 14, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Cambria', 'weight': 400}}"
+12,3,{'baselineOffset': 'SUBSCRIPT'}
+12, as the probability that ,"{'bold': False, 'fontFamily': 'Cambria', 'fontSize': {'magnitude': 14, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Cambria', 'weight': 400}}"
+12,x,{'bold': True}
+12," has class 3, and train with cross entropy loss.","{'bold': False, 'fontFamily': 'Cambria', 'fontSize': {'magnitude': 14, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Cambria', 'weight': 400}}"
+12,"
+",{}
+13,To find good weights we first define a loss function. This is a function of a particular model (represented by its,"{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+13, the weights,"{'foregroundColor': {'opaqueColor': {'rgbColor': {'red': 0.76862746, 'green': 0.46666667, 'blue': 0.21568628}}}}"
+13,) to a scalar value. ,"{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+13,"The better our model, the lower the loss. ",{'bold': True}
+13,"If we imagine a model with just two weights, the ","{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+13,model space,{'bold': True}
+13," forms a plane. For every point in this plane, our loss function defines a scalar loss, which we can draw above the plane as a surface: the ","{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+13,loss surface ,{'bold': True}
+13,"(sometimes also called, more poetically, the loss landscape).","{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+13,"
+",{}
+13,"Make sure you understand the difference between the model, a function from the inputs x to the outputs y in which the parameters theta act as constants, and the loss, a function from the parameters to a loss value, in which the data acts as constants.","{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+13,"
+",{}
+13,The symbol ,"{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+13,θ,"{'foregroundColor': {'opaqueColor': {'themeColor': 'ACCENT6'}}, 'bold': True}"
+13," is a common notation referring to the set of all weights (sometimes combined into a vector, sometimes just a set).","{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+13,"
+",{}
+15,Here are some common loss functions for situations where we have examples (t) of what the model output (y) should be for a given input (x). ,"{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+15,"
+",{}
+15,"The squared error losses are derived from basic regression. The (binary) cross entropy comes from logistic regression (as shown last lecture) and the hinge loss comes from support vector machine classification. You can find their derivations in most machine learning books/courses. We won’t elaborate on them here, except to note that in all cases the loss is lower if the model output (y) is closer to the example output (t).","{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+15,"
+",{}
+15,The loss can be computed for a single example or for multiple examples.,"{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+15," In almost all cases, the loss for multiple examples is just the sum over all their individual losses.",{'bold': True}
+15,"
+",{}
+16,We want to follow the loss surface down to the lowest point.,"{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+16,"
+",{}
+17,"In one dimension, we know that the derivative of a function (like the loss) tells us how much a function increases or decreases in we take a step of size 1 to the right.","{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+17,"
+",{}
+17,"To be more precise, it tells us how much the best linear approximation (the ","{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+17,tangent line,{'foregroundColor': {'opaqueColor': {'themeColor': 'ACCENT2'}}}
+17,) increases or decreases.,"{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+17,"
+",{}
+18,"If our input space has multiple dimensions, like our loss surface, we can simply take the derivative with respect to each input, seprately, treating the others as constants. This is called a","{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+18, partial derivative,{'bold': True}
+18,. The collection of all possible partial derivatives is called ,"{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+18,the gradient,{'bold': True}
+18,. ,"{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+18,"
+",{}
+18,"If we interpret the gradient  as a vector, it points in the direction in which the function grows the fastest. Taking a step in the opposite direction means we are walking down the loss surface.","{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+18,"
+",{}
+18,The symbol for the gradient is a downward pointing triangle called a nabla. The subscript indicates the variable over which we are taking the derivatives.  Note that in this case we are treating ,"{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+18,θ,{'foregroundColor': {'opaqueColor': {'themeColor': 'ACCENT6'}}}
+18, as a vector.,"{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+18,"
+",{}
+19,"This is the idea behind the gradient descent algorithm. We compute the gradient, take a small step in the opposite direction and repeat. The reason we take small steps is that the gradient is only the direction of steepest ascent locally, the further we move from our current position the worse an approximation the tangent hyperplane will be for the function that we are actually trying to follow.","{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+19,"
+",{}
+19,"In deep learning, we almost always us","{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+19,"e minibatch gradient descent,",{'bold': True}
+19, but there are some examples.,"{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+19,"
+",{}
+21,The learning rate is an important parameter to tune.,"{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+21,"
+",{}
+24,"Working out a gradient is usually done by hand, with pen and paper. This function is then transferred to code, and used in a gradient descent loop. But the more complicated out model becomes, the more complex it becomes to work out a complete formulation of the gradient.","{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+24,"
+",{}
+25,"For very simple models like linear regression or logistic regression, we can just work out the gradient by hand, with pen and paper.","{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+25,"
+",{}
+25,"Hewever, here is a diagram of the sort of network we’ll be encountering (the GoogLeNet). We can’t work out a complete gradient for this kind of architecture by hand. We need help.","{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+25,"
+",{}
+26,"Of course, working out derivatives is a pretty mechanical process. We could easily take all the rules we know, and put them into some algorithm. This is called symbolic differentiation, and it’s what systems like Wolfram Alpha do for us.","{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+26,"
+",{}
+26,"Unfortunately, as you can see here, the gradients it returns get pretty horrendous the deeper the neural network gets. This approach becomes impractical very quickly.","{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+26,"
+",{}
+26,Note that in symbolic differentiation we get an answer that,"{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+26, is independent of the input,{'bold': True}
+26,. We get a function that we can then feed and input to.,"{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+26,"
+",{}
+27,Another approach is to compute the gradient numerically. For instance by the method of finite differences: we take a small step,"{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+27, ε ,{'foregroundColor': {'opaqueColor': {'themeColor': 'ACCENT6'}}}
+27,"and, see how much the function changes. The amount of change divided by the step size is a good estimate for the  gradient if ","{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+27,ε,{'foregroundColor': {'opaqueColor': {'themeColor': 'ACCENT6'}}}
+27, is small enough.,"{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+27,"
+",{}
+27,"Numeric approaches are sometimes used, but it’s very expensive to make them accurate if you have a large number of parameters.","{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+27,"
+",{}
+27,"Note that in the numeric approach, you only get an answer ","{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+27,for a particular input,{'bold': True}
+27,". If you want to compute the gradient at some other point in space, you have to compute again.","{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+27,"
+",{}
+28,Backpropagation is a kind of middle ground between symbolic and numeric gradient descent. ,"{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+28,"
+",{}
+29,The single thing that makes backpropagation possible is ,"{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+29,the chain rule of differentiation,{'italic': True}
+29,". If we want the derivative of a function which is the composition of two other function, in this case ","{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+29,f,"{'foregroundColor': {'opaqueColor': {'rgbColor': {'red': 0.24705882, 'green': 0.4, 'blue': 0.5882353}}}}"
+29, and ,"{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+29,g,"{'foregroundColor': {'opaqueColor': {'rgbColor': {'red': 0.48235294, 'green': 0.5803922, 'blue': 0.2784314}}}}"
+29,", we can take the derivative of ","{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+29,f,"{'foregroundColor': {'opaqueColor': {'rgbColor': {'red': 0.24705882, 'green': 0.4, 'blue': 0.5882353}}}}"
+29, with respect to the output of ,"{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+29,g,"{'foregroundColor': {'opaqueColor': {'rgbColor': {'red': 0.48235294, 'green': 0.5803922, 'blue': 0.2784314}}}}"
+29, and  multiply it by the derivative of ,"{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+29,g,"{'foregroundColor': {'opaqueColor': {'rgbColor': {'red': 0.48235294, 'green': 0.5803922, 'blue': 0.2784314}}}}"
+29, with respect to the input x.,"{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+29,"
+",{}
+29,Since we’ll be using the chain rule ,"{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+29,a lot,{'italic': True}
+29,", we’ll introduce a simple shorthand to make it a little easier to parse. We draw a little diagram of which function feeds into which. This means we know what the argument of each function is, so we can remove the arguments from our notation.","{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+29,"
+",{}
+30,"Since the chain rule is the heart of backpropagation, and backpropagation is the heart of deep learning, we should probably take some time to see why the chain rule is true at all.","{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+30,"
+",{}
+30,If we imagine that ,"{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+30,f,"{'foregroundColor': {'opaqueColor': {'rgbColor': {'green': 0.42745098, 'blue': 0.64705884}}}}"
+30, and ,"{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+30,g,"{'foregroundColor': {'opaqueColor': {'rgbColor': {'red': 0.48235294, 'green': 0.5803922, 'blue': 0.2784314}}}}"
+30," are linear functions, it’s pretty straightforward to show that this is true. They may not be, of course, but the nice thing about calculus is that locally, we can treat them as linear functions (if they are differentiable). In an infinitessimally small neighbourhood f and g are exactly linear.","{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+30,"
+",{}
+30,In that case ,"{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+30,f,"{'foregroundColor': {'opaqueColor': {'rgbColor': {'green': 0.42745098, 'blue': 0.64705884}}}}"
+30, and ,"{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+30,g,"{'foregroundColor': {'opaqueColor': {'rgbColor': {'red': 0.48235294, 'green': 0.5803922, 'blue': 0.2784314}}}}"
+30, both have a ,"{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+30,"slope, ",{'italic': True}
+30,"s_f and s_g, which is simply the derivative at x. They also have additive constants b_f and b_g, which we’re not interested in. For these linear approximations, we can easily work out what what the function f(g(x)) looks like and what its slope is. It’s the slope of f times the slope of g (plus some constant value that doesn;t depend on x). This is exactly what the chain rule tells us.","{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+30,"
+",{}
+30,"If you want an example: imagine you have one investment scheme that doubles your money, and one that triples it: then, if you take the outcome of the first and put it into the second, you are multiplying your money by 6.","{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+30,"
+",{}
+30,"Note that this doesn’t quite count as a proof, but it’s hopefully enough to give you some intuition for why the chain rule holds.","{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+30,"
+",{}
+31,"Since we’ll be looking at some pretty elaborate compution graphs, we’ll need to be able to deal with this situation as well. We have a computation graph, as before, but ","{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+31,f,"{'foregroundColor': {'opaqueColor': {'rgbColor': {'green': 0.42745098, 'blue': 0.64705884}}}}"
+31, depends on x through ,"{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+31,two,"{'foregroundColor': {'opaqueColor': {'rgbColor': {'red': 0.48235294, 'green': 0.5803922, 'blue': 0.2784314}}}}"
+31, ,"{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+31,different ,"{'foregroundColor': {'opaqueColor': {'rgbColor': {'red': 0.4, 'green': 0.30980393, 'blue': 0.5058824}}}}"
+31,operations. How do we take the derivative of ,"{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+31,f,"{'foregroundColor': {'opaqueColor': {'rgbColor': {'green': 0.42745098, 'blue': 0.64705884}}}}"
+31, over x?,"{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+31,"
+",{}
+31,The multivariate chain rule tells us that we can simply apply the chain rule along ,"{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+31,g,"{'foregroundColor': {'opaqueColor': {'rgbColor': {'red': 0.48235294, 'green': 0.5803922, 'blue': 0.2784314}}}}"
+31,", taking ","{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+31,h,"{'foregroundColor': {'opaqueColor': {'rgbColor': {'red': 0.4, 'green': 0.30980393, 'blue': 0.5058824}}}}"
+31," as a constant, and sum it with the chain rule along ","{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+31,h,"{'foregroundColor': {'opaqueColor': {'rgbColor': {'red': 0.4, 'green': 0.30980393, 'blue': 0.5058824}}}}"
+31, taking ,"{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+31,g,"{'foregroundColor': {'opaqueColor': {'rgbColor': {'red': 0.48235294, 'green': 0.5803922, 'blue': 0.2784314}}}}"
+31, as a constant.,"{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+31,"
+",{}
+32,"We can see why this holds in the same way as before. The short story, since all functions can be taken to be linear, their slopes distribute out into a sum","{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+32,"
+",{}
+33,"If we have more than two paths from the input to the output, we simply sum over all of them.","{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+33,"
+",{}
+35,Here’s an example of how the chain rule can help us to automate complicated derivatives. We start with the function on the top left. We break up its form into a series of smaller operations. The entire function f is then just a chain of these small operations chained together. We can draw this in a diagram as we did before.,"{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+35,"
+",{}
+35,We will call this kind of diagram a ,"{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+35,computation graph,{'bold': True}
+35,. ,"{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+35,"
+",{}
+35,"Normally, we wouldn’t break a function up in such small operations. This is just a simple example to illustrate the principle.","{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+35,"
+",{}
+36,"Now, to work out the derivative of f, we can","{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+36, iterate the chain rule,{'italic': True}
+36,". We apply it again and again, until the derivative of f over x is expressed as a long product of derivatives of operation outputs over their inputs.","{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+36,"
+",{}
+37,We call the larger derivative of f over x the ,"{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+37,global derivative,{'bold': True}
+37,". And we call the individual factors, the derivatives of the operation output wrt to their inputs, the local derivatives.","{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+37,"
+",{}
+39,"Fir each local derivative, we work out, on pen an paper the symbolic derivative. Note that we could fill in the ","{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+39,a,"{'foregroundColor': {'opaqueColor': {'rgbColor': {'red': 0.48235294, 'green': 0.5803922, 'blue': 0.2784314}}}}"
+39,", ","{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+39,b,"{'foregroundColor': {'opaqueColor': {'rgbColor': {'red': 0.4, 'green': 0.30980393, 'blue': 0.5058824}}}}"
+39, and ,"{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+39,c,"{'foregroundColor': {'opaqueColor': {'rgbColor': {'red': 0.24705882, 'green': 0.4, 'blue': 0.5882353}}}}"
+39," in the result, but we don’t. We simply leave them as is, and continue with the numerical part of the algorithm.","{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+39,"
+",{}
+40,"We start by computing what is known as a forward pass. We pick some input, in this case x = -4.499, and we feed it through the computation graph. Crucially, we save all the intermediate values, as well as the output.","{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+40,"
+",{}
+40,"Note that at this point, we are no longer computing solutions in general. We are computing our function for a specific input. We’ll be computing the gradient for this specific input as well.","{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+40,"
+",{}
+41,"Keeping all intermediate values from the forward pass in memory, we go back to our symbolic expression of the derivative. Here, we fill in the intermediate values a b and c. After we do this, we can finish the multiplication numerically, giving us a numeric value of the gradient of f at x = -4.499.","{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+41,"
+",{}
+43,"To explain how backpropagation works in a neural network, we extend our diagram a little bit, to make it closer to the actual computation graph we’ll be using. ","{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+43,"
+",{}
+43,"First, we separate the hidden node into the result of the linear operation ","{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+43,k,"{'foregroundColor': {'opaqueColor': {'rgbColor': {'red': 0.48235294, 'green': 0.5803922, 'blue': 0.2784314}}}}"
+43,i,"{'foregroundColor': {'opaqueColor': {'rgbColor': {'red': 0.48235294, 'green': 0.5803922, 'blue': 0.2784314}}}, 'baselineOffset': 'SUBSCRIPT'}"
+43, ,"{'foregroundColor': {'opaqueColor': {'rgbColor': {'red': 0.48235294, 'green': 0.5803922, 'blue': 0.2784314}}}}"
+43,and the application of the nonlinearity ,"{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+43,h,"{'foregroundColor': {'opaqueColor': {'rgbColor': {'red': 0.23529412, 'green': 0.5372549, 'blue': 0.6156863}}}}"
+43,i,"{'foregroundColor': {'opaqueColor': {'rgbColor': {'red': 0.23529412, 'green': 0.5372549, 'blue': 0.6156863}}}, 'baselineOffset': 'SUBSCRIPT'}"
+43,". Second, since we’re interested in the derivative of the loss rather than the output of the network, we extend the network with one more step: the computation of the loss (over one example to keep things simple). In this final step, the output ","{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+43,y,{'foregroundColor': {'opaqueColor': {'themeColor': 'ACCENT4'}}}
+43," of the network is compared to the target value t from the data, producing a loss value.","{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+43,"
+",{}
+43,"You can thin of t as another input node, like x","{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+43,1,{'baselineOffset': 'SUBSCRIPT'}
+43, and x,"{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+43,2,{'baselineOffset': 'SUBSCRIPT'}
+43,", but one to which the model doesn’t have access.","{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+43,"
+",{}
+44,"We want to work out the gradient of the loss over the parameters. We’ll isolate two parameters, ","{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+44,v,"{'foregroundColor': {'opaqueColor': {'rgbColor': {'red': 0.76862746, 'green': 0.46666667, 'blue': 0.21568628}}}}"
+44,2,"{'foregroundColor': {'opaqueColor': {'rgbColor': {'red': 0.76862746, 'green': 0.46666667, 'blue': 0.21568628}}}, 'baselineOffset': 'SUBSCRIPT'}"
+44," in the second layer, and ","{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+44,w,"{'foregroundColor': {'opaqueColor': {'rgbColor': {'red': 0.76862746, 'green': 0.46666667, 'blue': 0.21568628}}}}"
+44,12,"{'foregroundColor': {'opaqueColor': {'rgbColor': {'red': 0.76862746, 'green': 0.46666667, 'blue': 0.21568628}}}, 'baselineOffset': 'SUBSCRIPT'}"
+44," in the first, and see how backpropagation operates. ","{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+44,"
+",{}
+44,"First, we have to break the computation of the loss into operations. If we take the graph on the left to be our computation graph, then we end up with the operations of the right.","{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+44,"
+",{}
+44,"To simplify things, we’ll compute the loss over only one example. We’ll also use a simple squared error loss.","{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+44,"
+",{}
+45,For the derivative with respect to ,"{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+45,v,"{'foregroundColor': {'opaqueColor': {'rgbColor': {'red': 0.76862746, 'green': 0.46666667, 'blue': 0.21568628}}}}"
+45,2,"{'foregroundColor': {'opaqueColor': {'rgbColor': {'red': 0.76862746, 'green': 0.46666667, 'blue': 0.21568628}}}, 'baselineOffset': 'SUBSCRIPT'}"
+45,", we’ll only need these two operations. Anything below doesn’t affect the result.","{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+45,"
+",{}
+45,"To work out the derivative we apply the chain rule, and work out the local derivatives symbolically.","{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+45,"
+",{}
+46,"We then do a forward pass with some values. We get an output of 10.1, which should have been 12.1, so our loss is 4. We keep all intermediate values in memory.","{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+46,"
+",{}
+46,"We then take our product of local derivatives, fill in the numeric values from the forward pass, and compute the derivative over ","{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+46,v,"{'foregroundColor': {'opaqueColor': {'rgbColor': {'red': 0.76862746, 'green': 0.46666667, 'blue': 0.21568628}}}}"
+46,2,"{'foregroundColor': {'opaqueColor': {'rgbColor': {'red': 0.76862746, 'green': 0.46666667, 'blue': 0.21568628}}}, 'baselineOffset': 'SUBSCRIPT'}"
+46,.,"{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+46,"
+",{}
+46,"When we apply this derivative in a gradient descent update, ","{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+46,v,"{'foregroundColor': {'opaqueColor': {'rgbColor': {'red': 0.76862746, 'green': 0.46666667, 'blue': 0.21568628}}}}"
+46,2,"{'foregroundColor': {'opaqueColor': {'rgbColor': {'red': 0.76862746, 'green': 0.46666667, 'blue': 0.21568628}}}, 'baselineOffset': 'SUBSCRIPT'}"
+46, ,"{'foregroundColor': {'opaqueColor': {'rgbColor': {'red': 0.76862746, 'green': 0.46666667, 'blue': 0.21568628}}}}"
+46,changes as shown below.,"{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+46,"
+",{}
+47,Let’s try something a bit earlier in the network: the weight ,"{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+47,w,"{'foregroundColor': {'opaqueColor': {'rgbColor': {'red': 0.76862746, 'green': 0.46666667, 'blue': 0.21568628}}}}"
+47,12,"{'foregroundColor': {'opaqueColor': {'rgbColor': {'red': 0.76862746, 'green': 0.46666667, 'blue': 0.21568628}}}, 'baselineOffset': 'SUBSCRIPT'}"
+47,". We add two operations, apply the chain rule and work out the local derivatives.","{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+47,"
+",{}
+48,"Note that when we’re computing the derivative for w_12, we are also, along the way computing the derivatives for y, h2 and k2.","{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+48,"
+",{}
+48,"This useful when it comes to implementing backpropagation. We can walk backward from the computation graph and compute the derivative of the loss for every node. For the nodes below, we just multiply the local gradient. This means we can very efficiently compute any derivatives we need.","{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+48,"
+",{}
+48,We will show this more precisely in the last part of this lecture.,"{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+48,"
+",{}
+50,"To finish up, let’s see if we can build a little intuition for what all these accumulated derivatives mean.","{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+50,"
+",{}
+50,"Here is a forward pass for some weights and some inputs. Backpropagation starts with the loss, and walks down the network, figuring out at each step how every value contributed to the result of the forward pass. Every value that contributed positively to a positive loss should be lowered, every value that contributed positively to a negative loss should be increased, and so on.","{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+50,"
+",{}
+51,"We’ll start with the first value below the loss: y. Of course, this a isn’t","{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+51, parameter,{'italic': True}
+51," of the network, but let’s imagine for a moment that it is. What would the gradient descent update rule look like if we try to update y?","{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+51,"
+",{}
+51,"Even though we can’t change y directly, this is the effect we want to achieve: we want to change the parameters we ","{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+51,can,{'italic': True}
+51, change  so that we achieve this change in y.,"{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+51,"
+",{}
+51,Note that the error (the derivative of the loss) takes ,"{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+51,the sign,{'bold': True}
+51," into account. If our model output is 0, and our target is 10, the loss is the same, but the error is","{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+51, minus 20,{'italic': True}
+51,", and the update rule for y ","{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+51,"
+",{}
+52,Instead of changing ,"{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+52,y,"{'foregroundColor': {'opaqueColor': {'rgbColor': {'red': 0.4, 'green': 0.30980393, 'blue': 0.5058824}}}}"
+52,", we have to change the values that influenced ","{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+52,y,"{'foregroundColor': {'opaqueColor': {'rgbColor': {'red': 0.4, 'green': 0.30980393, 'blue': 0.5058824}}}}"
+52,. Here we see what that looks like for the ,"{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+52,weights,"{'foregroundColor': {'opaqueColor': {'rgbColor': {'red': 0.76862746, 'green': 0.46666667, 'blue': 0.21568628}}}}"
+52, of the second layer.,"{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+52,"
+",{}
+52,Note that the current value of the weight doesn’t factor into the update. Only how much influence the weight had on the value of ,"{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+52,y,"{'foregroundColor': {'opaqueColor': {'rgbColor': {'red': 0.76862746, 'green': 0.46666667, 'blue': 0.21568628}}}}"
+52, in the forward pass. The higher the activation of the ,"{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+52,source node,"{'foregroundColor': {'opaqueColor': {'rgbColor': {'red': 0.23529412, 'green': 0.5372549, 'blue': 0.6156863}}}}"
+52,", the more the weight gets adjusted.","{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+52,"
+",{}
+53,The sigmoid activation we’ve used so far allows only positive values to emerge from the hidden layer. If we switch to an activation that also allows negative activations (like a linear activation or a ,"{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+53,tanh,{'bold': True}
+53," activation), we see that backpropagation very naturally takes the sign into account.","{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+53,"
+",{}
+53,"In this case, we want to update in such a way that ","{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+53,y,"{'foregroundColor': {'opaqueColor': {'rgbColor': {'red': 0.4, 'green': 0.30980393, 'blue': 0.5058824}}}}"
+53," decreases, but we note that the weight ","{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+53,v,"{'foregroundColor': {'opaqueColor': {'rgbColor': {'red': 0.76862746, 'green': 0.46666667, 'blue': 0.21568628}}}}"
+53,2,"{'foregroundColor': {'opaqueColor': {'rgbColor': {'red': 0.76862746, 'green': 0.46666667, 'blue': 0.21568628}}}, 'baselineOffset': 'SUBSCRIPT'}"
+53, is multiplied by a ,"{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+53,negative,{'italic': True}
+53, value. This means that (for this instance) ,"{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+53,v,"{'foregroundColor': {'opaqueColor': {'rgbColor': {'red': 0.76862746, 'green': 0.46666667, 'blue': 0.21568628}}}}"
+53,2,"{'foregroundColor': {'opaqueColor': {'rgbColor': {'red': 0.76862746, 'green': 0.46666667, 'blue': 0.21568628}}}, 'baselineOffset': 'SUBSCRIPT'}"
+53," contributes negatively to the loss, and its value should be increased.","{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+53,"
+",{}
+53,Note that the sign of ,"{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+53,v,"{'foregroundColor': {'opaqueColor': {'rgbColor': {'red': 0.76862746, 'green': 0.46666667, 'blue': 0.21568628}}}}"
+53,2,"{'foregroundColor': {'opaqueColor': {'rgbColor': {'red': 0.76862746, 'green': 0.46666667, 'blue': 0.21568628}}}, 'baselineOffset': 'SUBSCRIPT'}"
+53," itself doesn’t matter. Whether it’s positive or negative, its value should increase.","{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+53,"
+",{}
+54,If we could change ,"{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+54,h,"{'foregroundColor': {'opaqueColor': {'rgbColor': {'red': 0.23529412, 'green': 0.5372549, 'blue': 0.6156863}}}}"
+54,2,"{'foregroundColor': {'opaqueColor': {'rgbColor': {'red': 0.23529412, 'green': 0.5372549, 'blue': 0.6156863}}}, 'baselineOffset': 'SUBSCRIPT'}"
+54," directly, this is how we’d do it. We take the value of ","{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+54,v,"{'foregroundColor': {'opaqueColor': {'rgbColor': {'red': 0.76862746, 'green': 0.46666667, 'blue': 0.21568628}}}}"
+54,2,"{'foregroundColor': {'opaqueColor': {'rgbColor': {'red': 0.76862746, 'green': 0.46666667, 'blue': 0.21568628}}}, 'baselineOffset': 'SUBSCRIPT'}"
+54, to be a constant. We want to decrease the output of the network. Since ,"{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+54,v,"{'foregroundColor': {'opaqueColor': {'rgbColor': {'red': 0.76862746, 'green': 0.46666667, 'blue': 0.21568628}}}}"
+54,2,"{'foregroundColor': {'opaqueColor': {'rgbColor': {'red': 0.76862746, 'green': 0.46666667, 'blue': 0.21568628}}}, 'baselineOffset': 'SUBSCRIPT'}"
+54, makes a ,"{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+54,negative,{'italic': True}
+54," contribution to the loss, we can achieve this by","{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+54, increasing,{'italic': True}
+54, the activation of the source node of ,"{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+54,v,"{'foregroundColor': {'opaqueColor': {'rgbColor': {'red': 0.76862746, 'green': 0.46666667, 'blue': 0.21568628}}}}"
+54,2,"{'foregroundColor': {'opaqueColor': {'rgbColor': {'red': 0.76862746, 'green': 0.46666667, 'blue': 0.21568628}}}, 'baselineOffset': 'SUBSCRIPT'}"
+54,.,"{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+54,"
+",{}
+55,"Moving down to k2, remember that the derivative of the sigmoid is the output of the sigmoid times 1 minus that output.","{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+55,"
+",{}
+55,"We see here, that in the extreme regimes, the sigmoid is ","{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+55,resistant to change,{'italic': True}
+55,. The close to 1 or 0 we get the smaller the weight update becomes.,"{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+55,"
+",{}
+55,"This is actually a great downside of the sigmoid activation, and one of the big reasons it was eventually replaced by the ReLU as the default choice for hidden units. We’ll come back to this in later lectures.","{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+55,"
+",{}
+55,"Nevertheless, this update rule tells us what the change is to ","{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+55,k,"{'foregroundColor': {'opaqueColor': {'rgbColor': {'red': 0.48235294, 'green': 0.5803922, 'blue': 0.2784314}}}}"
+55,2,"{'foregroundColor': {'opaqueColor': {'rgbColor': {'red': 0.48235294, 'green': 0.5803922, 'blue': 0.2784314}}}, 'baselineOffset': 'SUBSCRIPT'}"
+55, that we ,"{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+55,want to achieve,{'italic': True}
+55, by changing the gradients we can actually change (in this case ,"{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+55,the weights,"{'foregroundColor': {'opaqueColor': {'rgbColor': {'red': 0.76862746, 'green': 0.46666667, 'blue': 0.21568628}}}}"
+55, of layer 1).,"{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+55,"
+",{}
+56,"Finally, we come to the weights of the first layer. As before, we want the output of the network to ","{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+56,de,{'italic': True}
+56,"crease. To achieve this, we want ","{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+56,h,"{'foregroundColor': {'opaqueColor': {'rgbColor': {'red': 0.23529412, 'green': 0.5372549, 'blue': 0.6156863}}}}"
+56,2,"{'foregroundColor': {'opaqueColor': {'rgbColor': {'red': 0.23529412, 'green': 0.5372549, 'blue': 0.6156863}}}, 'baselineOffset': 'SUBSCRIPT'}"
+56, to ,"{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+56,in,{'italic': True}
+56,crease (because ,"{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+56,v,"{'foregroundColor': {'opaqueColor': {'rgbColor': {'red': 0.76862746, 'green': 0.46666667, 'blue': 0.21568628}}}}"
+56,2,"{'foregroundColor': {'opaqueColor': {'rgbColor': {'red': 0.76862746, 'green': 0.46666667, 'blue': 0.21568628}}}, 'baselineOffset': 'SUBSCRIPT'}"
+56," is negative). However, the input x","{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+56,1,{'baselineOffset': 'SUBSCRIPT'}
+56," is negative, so we should decrease ","{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+56,w,"{'foregroundColor': {'opaqueColor': {'rgbColor': {'red': 0.76862746, 'green': 0.46666667, 'blue': 0.21568628}}}}"
+56,12,"{'foregroundColor': {'opaqueColor': {'rgbColor': {'red': 0.76862746, 'green': 0.46666667, 'blue': 0.21568628}}}, 'baselineOffset': 'SUBSCRIPT'}"
+56, to increase ,"{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+56,h,"{'foregroundColor': {'opaqueColor': {'rgbColor': {'red': 0.23529412, 'green': 0.5372549, 'blue': 0.6156863}}}}"
+56,2,"{'foregroundColor': {'opaqueColor': {'rgbColor': {'red': 0.23529412, 'green': 0.5372549, 'blue': 0.6156863}}}, 'baselineOffset': 'SUBSCRIPT'}"
+56,. This is all beautifully captured by the chain rule: the two negatives of x,"{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+56,1,{'baselineOffset': 'SUBSCRIPT'}
+56, and ,"{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+56,v,"{'foregroundColor': {'opaqueColor': {'rgbColor': {'red': 0.76862746, 'green': 0.46666667, 'blue': 0.21568628}}}}"
+56,2,"{'foregroundColor': {'opaqueColor': {'rgbColor': {'red': 0.76862746, 'green': 0.46666667, 'blue': 0.21568628}}}, 'baselineOffset': 'SUBSCRIPT'}"
+56, cancel out and we get a positive value which we subtract from ,"{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+56,w,"{'foregroundColor': {'opaqueColor': {'rgbColor': {'red': 0.76862746, 'green': 0.46666667, 'blue': 0.21568628}}}}"
+56,12,"{'foregroundColor': {'opaqueColor': {'rgbColor': {'red': 0.76862746, 'green': 0.46666667, 'blue': 0.21568628}}}, 'baselineOffset': 'SUBSCRIPT'}"
+56,.,"{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+56,"
+",{}
+58,Assume that ,"{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+58,k,"{'foregroundColor': {'opaqueColor': {'rgbColor': {'red': 0.48235294, 'green': 0.5803922, 'blue': 0.2784314}}}}"
+58, and ,"{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+58,y,"{'foregroundColor': {'opaqueColor': {'rgbColor': {'red': 0.4, 'green': 0.30980393, 'blue': 0.5058824}}}}"
+58, are initialized with 0s.,"{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+58,"
+",{}
+59,"Note that we don’t implement the derivations from slide 39 directly. Instead, we work backwards down the neural network: computing the derivative of each node as we go by taking the derivative of the los over the outputs and multiplying it by the local derivative.","{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+59,"
+",{}
+60,"To look at this a bit more closely, we’ll use an analogy. Think of the neural network as a hierarchical structure like a government, trying to make a decision. The output node is the prime minister: he provides the final decision (for instance what the tax on cigarettes should be). ","{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+60,"
+",{}
+60,"To make this decision, he listens to his ministers. His ministers don’t tell him what to do, they just shout. The louder they shout, the higher they want him to make the output.","{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+60,"
+",{}
+60,"If he trusts a particular minister, he will ","{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+60,weigh,"{'foregroundColor': {'opaqueColor': {'rgbColor': {'red': 0.76862746, 'green': 0.46666667, 'blue': 0.21568628}}}}"
+60, their advice ,"{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+60,positively,{'italic': True}
+60,", and follow their advice. If he ","{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+60,dis,{'italic': True}
+60,"trusts the minister, he will do the opposite of what the minister says: that is their ","{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+60,weight,"{'foregroundColor': {'opaqueColor': {'rgbColor': {'red': 0.76862746, 'green': 0.46666667, 'blue': 0.21568628}}}}"
+60," will be negative. The ministers each listen to a bank of civil servants and weigh their opinions in the same way the prime minister weight theirs. All ministers listen to the same civil servants, but they have their own","{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+60, level of trust ,"{'foregroundColor': {'opaqueColor': {'rgbColor': {'red': 0.76862746, 'green': 0.46666667, 'blue': 0.21568628}}}}"
+60,for each.,"{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+60,"
+",{}
+60,"(We haven’t drawn the bias, but you can think of the bias as the prime minister’s own opinion; how strong the opinions of the ministers need to be to change his mind).","{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+60,"
+",{}
+60,"
+","{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+60,image sources: ,"{'bold': False, 'fontFamily': 'Cambria', 'fontSize': {'magnitude': 8, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Cambria', 'weight': 400}}"
+60,"
+",{}
+60,https://www.government.nl/government/members-of-cabinet/mark-rutte,"{'foregroundColor': {'opaqueColor': {'rgbColor': {'red': 0.011764706, 'green': 0.39607844, 'blue': 0.7529412}}}, 'bold': True, 'link': {'url': 'https://www.government.nl/government/members-of-cabinet/mark-rutte'}, 'underline': True}"
+60,"
+",{}
+60,https://www.government.nl/government/members-of-cabinet/ingrid-van-engelshoven,"{'foregroundColor': {'opaqueColor': {'rgbColor': {'red': 0.011764706, 'green': 0.39607844, 'blue': 0.7529412}}}, 'bold': True, 'link': {'url': 'https://www.government.nl/government/members-of-cabinet/ingrid-van-engelshoven'}, 'underline': True}"
+60,"
+",{}
+60,https://www.rijksoverheid.nl/regering/bewindspersonen/kajsa-ollongren,"{'foregroundColor': {'opaqueColor': {'rgbColor': {'red': 0.011764706, 'green': 0.39607844, 'blue': 0.7529412}}}, 'bold': True, 'link': {'url': 'https://www.rijksoverheid.nl/regering/bewindspersonen/kajsa-ollongren'}, 'underline': True}"
+60,"
+",{}
+60,"Door Photo: Yordan Simeonov (EU2018BG) - Dit bestand is afgeleid van: Informal JHA meeting (Justice) Arrivals (26031834658).jpg, CC BY-SA 2.0, ","{'bold': False, 'fontFamily': 'Cambria', 'fontSize': {'magnitude': 8, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Cambria', 'weight': 400}}"
+60,https://commons.wikimedia.org/w/index.php?curid=70324317,"{'foregroundColor': {'opaqueColor': {'rgbColor': {'red': 0.011764706, 'green': 0.39607844, 'blue': 0.7529412}}}, 'bold': True, 'link': {'url': 'https://commons.wikimedia.org/w/index.php?curid=70324317'}, 'underline': True}"
+60,"
+",{}
+61,So let’s say the network has produced an output. The prime minister has set a tax on cigarettes ,"{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+61,y,"{'foregroundColor': {'opaqueColor': {'rgbColor': {'red': 0.23529412, 'green': 0.5372549, 'blue': 0.6156863}}}}"
+61,", and based on the consequences realises that he should actually have set a tax of t. He’s now going to adjust his level of trust in each of his subordinates.","{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+61,"
+",{}
+61,Looking at the update rule for weight ,"{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+61,v,"{'foregroundColor': {'opaqueColor': {'rgbColor': {'red': 0.87058824, 'green': 0.41568628, 'blue': 0.0627451}}}}"
+61,2,"{'foregroundColor': {'opaqueColor': {'rgbColor': {'red': 0.87058824, 'green': 0.41568628, 'blue': 0.0627451}}}, 'baselineOffset': 'SUBSCRIPT'}"
+61,", we can see that he takes two things into account: the error (","{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+61,y,"{'foregroundColor': {'opaqueColor': {'rgbColor': {'red': 0.4, 'green': 0.30980393, 'blue': 0.5058824}}}}"
+61,"-t), how wrong he was, and what minister","{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+61, ,"{'foregroundColor': {'opaqueColor': {'rgbColor': {'red': 0.8627451, 'green': 0.7411765, 'blue': 0.13725491}}}}"
+61,h,"{'foregroundColor': {'opaqueColor': {'rgbColor': {'red': 0.23529412, 'green': 0.5372549, 'blue': 0.6156863}}}}"
+61,2,"{'foregroundColor': {'opaqueColor': {'rgbColor': {'red': 0.23529412, 'green': 0.5372549, 'blue': 0.6156863}}}, 'baselineOffset': 'SUBSCRIPT'}"
+61, told him to do.,"{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+61,"
+",{}
+61,"If  the error is positive, he set ","{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+61,y,"{'foregroundColor': {'opaqueColor': {'rgbColor': {'red': 0.4, 'green': 0.30980393, 'blue': 0.5058824}}}}"
+61, too high. If ,"{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+61,h,"{'foregroundColor': {'opaqueColor': {'rgbColor': {'red': 0.23529412, 'green': 0.5372549, 'blue': 0.6156863}}}}"
+61,2,"{'foregroundColor': {'opaqueColor': {'rgbColor': {'red': 0.23529412, 'green': 0.5372549, 'blue': 0.6156863}}}, 'baselineOffset': 'SUBSCRIPT'}"
+61," shouted loudly, he will lower his trust in her. ","{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+61,"
+",{}
+61,"If the error is negative, he set ","{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+61,y,"{'foregroundColor': {'opaqueColor': {'rgbColor': {'red': 0.4, 'green': 0.30980393, 'blue': 0.5058824}}}}"
+61, too low. If ,"{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+61,h,"{'foregroundColor': {'opaqueColor': {'rgbColor': {'red': 0.23529412, 'green': 0.5372549, 'blue': 0.6156863}}}}"
+61,2,"{'foregroundColor': {'opaqueColor': {'rgbColor': {'red': 0.23529412, 'green': 0.5372549, 'blue': 0.6156863}}}, 'baselineOffset': 'SUBSCRIPT'}"
+61," shouted loudly, he will increase his trust in her. ","{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+61,"
+",{}
+61,"If we use a sigmoid activation, the ministers can only provide values between 0 and 1. If we use an activation that allows ","{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+61,h,"{'foregroundColor': {'opaqueColor': {'rgbColor': {'red': 0.23529412, 'green': 0.5372549, 'blue': 0.6156863}}}}"
+61,2,"{'foregroundColor': {'opaqueColor': {'rgbColor': {'red': 0.23529412, 'green': 0.5372549, 'blue': 0.6156863}}}, 'baselineOffset': 'SUBSCRIPT'}"
+61," to be negative (for instance a tanh activation), we see that the minister takes the sign into account: if ","{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+61,h,"{'foregroundColor': {'opaqueColor': {'rgbColor': {'red': 0.23529412, 'green': 0.5372549, 'blue': 0.6156863}}}}"
+61,2,"{'foregroundColor': {'opaqueColor': {'rgbColor': {'red': 0.23529412, 'green': 0.5372549, 'blue': 0.6156863}}}, 'baselineOffset': 'SUBSCRIPT'}"
+61," was negative and the error was negative too, the trust in the minister increases (because the PM should’ve listened to her).","{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+61,"
+",{}
+62,To see how much minister ,"{'bold': False, 'fontFamily': 'Cambria', 'fontSize': {'magnitude': 14, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Cambria', 'weight': 400}}"
+62,h,"{'foregroundColor': {'opaqueColor': {'rgbColor': {'red': 0.6392157, 'green': 0.45882353, 'blue': 0.07058824}}}}"
+62,2,"{'foregroundColor': {'opaqueColor': {'rgbColor': {'red': 0.6392157, 'green': 0.45882353, 'blue': 0.07058824}}}, 'baselineOffset': 'SUBSCRIPT'}"
+62, needs to adjust her trust in x,"{'bold': False, 'fontFamily': 'Cambria', 'fontSize': {'magnitude': 14, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Cambria', 'weight': 400}}"
+62,1,{'baselineOffset': 'SUBSCRIPT'}
+62,", she first looks at the ","{'bold': False, 'fontFamily': 'Cambria', 'fontSize': {'magnitude': 14, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Cambria', 'weight': 400}}"
+62,global error,{'italic': True}
+62,.,"{'bold': False, 'fontFamily': 'Cambria', 'fontSize': {'magnitude': 14, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Cambria', 'weight': 400}}"
+62,"
+",{}
+62,"To see how much she contributed to that global error, and whether she contributed negatively or positively, she multiplies by ","{'bold': False, 'fontFamily': 'Cambria', 'fontSize': {'magnitude': 14, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Cambria', 'weight': 400}}"
+62,v,"{'foregroundColor': {'opaqueColor': {'rgbColor': {'red': 0.7411765, 'green': 0.35686275, 'blue': 0.047058824}}}}"
+62,2,"{'foregroundColor': {'opaqueColor': {'rgbColor': {'red': 0.7411765, 'green': 0.35686275, 'blue': 0.047058824}}}, 'baselineOffset': 'SUBSCRIPT'}"
+62,", her level of influence over the decision. This is a crucial part of  backpropagation:","{'bold': False, 'fontFamily': 'Cambria', 'fontSize': {'magnitude': 14, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Cambria', 'weight': 400}}"
+62," if the outcome was bad, but the prime minister did the opposite of what she said (because ",{'bold': True}
+62,v,"{'foregroundColor': {'opaqueColor': {'rgbColor': {'red': 0.76862746, 'green': 0.46666667, 'blue': 0.21568628}}}, 'bold': True}"
+62,2,"{'foregroundColor': {'opaqueColor': {'rgbColor': {'red': 0.76862746, 'green': 0.46666667, 'blue': 0.21568628}}}, 'bold': True, 'baselineOffset': 'SUBSCRIPT'}"
+62," was negative), she should actually boost her trust in the civil servants that told her to do as she did.",{'bold': True}
+62, Even if the global error (,"{'bold': False, 'fontFamily': 'Cambria', 'fontSize': {'magnitude': 14, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Cambria', 'weight': 400}}"
+62,y,"{'foregroundColor': {'opaqueColor': {'rgbColor': {'red': 0.4, 'green': 0.30980393, 'blue': 0.5058824}}}}"
+62," - t)  is negative, her personal error (","{'bold': False, 'fontFamily': 'Cambria', 'fontSize': {'magnitude': 14, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Cambria', 'weight': 400}}"
+62,y,"{'foregroundColor': {'opaqueColor': {'rgbColor': {'red': 0.4, 'green': 0.30980393, 'blue': 0.5058824}}}}"
+62, -t ),"{'bold': False, 'fontFamily': 'Cambria', 'fontSize': {'magnitude': 14, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Cambria', 'weight': 400}}"
+62,v,"{'foregroundColor': {'opaqueColor': {'rgbColor': {'red': 0.76862746, 'green': 0.46666667, 'blue': 0.21568628}}}}"
+62,2,"{'foregroundColor': {'opaqueColor': {'rgbColor': {'red': 0.76862746, 'green': 0.46666667, 'blue': 0.21568628}}}, 'baselineOffset': 'SUBSCRIPT'}"
+62, may be positive. The chain rule takes care of all of this automatically.,"{'bold': False, 'fontFamily': 'Cambria', 'fontSize': {'magnitude': 14, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Cambria', 'weight': 400}}"
+62,"
+",{}
+62,"Then she looks at how much the input from all her subordinates influenced the decision, considering the activation function (that is, if the input was very high, she’ll need a bigger adjustment to make a meaningful difference). Finally she multiplies by x","{'bold': False, 'fontFamily': 'Cambria', 'fontSize': {'magnitude': 14, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Cambria', 'weight': 400}}"
+62,1,{'baselineOffset': 'SUBSCRIPT'}
+62,", to isolate the effect that we trust in x","{'bold': False, 'fontFamily': 'Cambria', 'fontSize': {'magnitude': 14, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Cambria', 'weight': 400}}"
+62,1,{'baselineOffset': 'SUBSCRIPT'}
+62, had on her decision.,"{'bold': False, 'fontFamily': 'Cambria', 'fontSize': {'magnitude': 14, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Cambria', 'weight': 400}}"
+62,"
+",{}
+65,"The computation of a neural net may be complicated, but when we express everything as matrix multiplications and other operations in linear algebra, things become much simpler (once we get used to this way of thinking). Not only that, but the computation becomes much quicker as well.","{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+65,"
+",{}
+66,"When we look at the computation of a neural network, we can see that most operations can be expressed very naturally in those of linear algebra.","{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+66,"
+",{}
+66,The multiplication of weights by their inputs is a multiplication of ,"{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+66,a matrix of weights,"{'foregroundColor': {'opaqueColor': {'rgbColor': {'red': 0.76862746, 'green': 0.46666667, 'blue': 0.21568628}}}}"
+66, by a vector of inputs.,"{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+66,"
+",{}
+66,The addition of a bias is the addition of,"{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+66, a vector of bias parameters,"{'foregroundColor': {'opaqueColor': {'rgbColor': {'red': 0.24705882, 'green': 0.4, 'blue': 0.5882353}}}}"
+66,.,"{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+66,"
+",{}
+66,The nonlinearities can be implemented as simple element-wise operations.,"{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+66,"
+",{}
+66,This perspective buys us two things. First…,"{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+66,"
+",{}
+67,Our notation becomes extremely simple. We can describe the whole operation of a neural network with one easily parseable equation. This expressiveness will be sorely needed when we move to more complicated networks.,"{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+67,"
+",{}
+68,The second reason is that the biggest computational bottleneck in a neural network is the matrix multiplication. This operation is more than quadratic while everything else is linear. ,"{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+68,"
+",{}
+68,"Matrix multiplication (and other tensor operations like it) can be parallelized and implemented efficiently but it’s a lot of work. Ideally, we’d like to let somebody else do all that work (like the implementers of ","{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+68,numpy,"{'bold': False, 'fontFamily': 'Arial', 'weightedFontFamily': {'fontFamily': 'Arial', 'weight': 400}}"
+68,) and then just call their code to do the matrix multiplications.,"{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+68,"
+",{}
+68,"This is especially important if you have access to a GPU. A matrix multiplication can easily be offloaded to the GPU for much faster processing, but for a loop over an array, there’s no benefit.","{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+68,"
+",{}
+68,This is called ,"{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+68,vectorizing,{'bold': True}
+68,": taking a piece of code written in for loops, and getting rid of the loops by expressing the function as a sequence of linear algebra operations.","{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+68,"
+",{}
+70,Here’s what the forward pass looks like in pseudocode. When you implement this in numpy it’ll look almost the same.,"{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+70,"
+",{}
+71,"Of course, we lose a lot of the benefit of vectorizing if the backward pass isn’t also expressed in terms of matrix multiplications. How do we vectorize the backward pass?","{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+71,"
+",{}
+71,"On the left, we see the forward pass of our loss computation as a set of operations on vectors and matrices. (We’ve generalized things by giving the network a vector output ","{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+71,y,"{'foregroundColor': {'opaqueColor': {'rgbColor': {'red': 0.4, 'green': 0.30980393, 'blue': 0.5058824}}}, 'bold': True}"
+71, and vector target ,"{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+71,t,{'bold': True}
+71,).,"{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+71,"
+",{}
+71,"To generalize backpropagation to this view, we might ask if something similar to the chain rule exists for vectors and matrices. Firstly, can we define something analogous to the derivative of one matrix over another, and secondly, can we break this apart into a product of local derivatives, possibly giving us a sequence of matrix multiplications?","{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+71,"
+",{}
+71,"The answer is yes, there are many ways of applying calculus to vectors and matrices, and there are many chain rules available in these domains. However, things can quickly get a little hairy, so we need to tread carefully.","{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+71,"
+",{}
+72,"The derivatives of high-dimensional objects are easily defined. We simply take the derivative of every input over every output, and we arrange all possibilities into some logical shape. For instance, if we have a vector-to-vector function, the natural analog of the derivative is a matrix with all the partial derivatives in it. ","{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+72,"
+",{}
+72,"However, once we get to matrix/vector operations or matrix/matrix operations, the only way to logically arrange every input with every output is a tensor of higher dimension than 2.","{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+72,"
+",{}
+72,NB: We don’t normally apply the differential symbol to non-scalars like this. We’ll introduce better notation later.,{'bold': True}
+72,"
+",{}
+73,"As we see, even if we could come up with this kind of chain rule, one of the local derivatives is now a vector over a matrix. The result could only be represented in a 3-tensor. There are two problems with this:","{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+73,"
+",{}
+73,"If the layer has n inputs and n outputs, we are computing n","{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+73,3,{'baselineOffset': 'SUPERSCRIPT'}
+73," derivatives, even though we were only ultimately interested in n","{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+73,2,{'baselineOffset': 'SUPERSCRIPT'}
+73, of them (the derivatives of W). In the scalar algorithm we only ever had two nested loops (an n,"{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+73,2,{'baselineOffset': 'SUPERSCRIPT'}
+73," complexity), and we only ever stored one gradient for one node in the computation graph. Now we suddenly have n","{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+73,3,{'baselineOffset': 'SUPERSCRIPT'}
+73, complexity and n,"{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+73,3,{'baselineOffset': 'SUPERSCRIPT'}
+73, memory use. We were supposed to make things faster.,"{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+73,"
+",{}
+73,"We can easily represent a 3-tensor, but there’s no obvious, default way to multiply  a 3-tensor with a matrix, or with a vector (in fact there are many different ways). The multiplication of the chain rule becomes very complicated this way.","{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+73,"
+",{}
+73,"In short, we need a more careful approach.","{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+73,"
+",{}
+74,To work out how to do this we make these following simplifying assumptions.,"{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+74,"
+",{}
+75,"Note that this doesn’t mean we can only ever train neural networks with a single scalar  output. Our neural networks  can have any number of outputs of any shape and size. However, the ","{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+75,loss,{'italic': True}
+75," we define over those outputs needs to map them all to a single scalar value. The computation graph is always the model, plus the computation of the loss.","{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+75,"
+",{}
+76,"We call this derivative the gradient. This is a common term, but we will deviate from the standard approach in one respect. ","{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+76,"
+",{}
+76,"Normally, the gradient defined as a row vector, so that it can operate on a space of column vectors by matrix multiplication.","{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+76,"
+",{}
+76,"In our case, we are never interested in matrix multiplying the gradient by anything. We only ever want to sum the gradient of l wrt  ","{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+76,W,"{'foregroundColor': {'opaqueColor': {'rgbColor': {'red': 0.76862746, 'green': 0.46666667, 'blue': 0.21568628}}}, 'bold': True}"
+76, with the original matrix ,"{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+76,W,"{'foregroundColor': {'opaqueColor': {'rgbColor': {'red': 0.76862746, 'green': 0.46666667, 'blue': 0.21568628}}}, 'bold': True}"
+76, in a gradient update step. For this reason we define the gradient as having the same shape as the tensor with respect to which we are taking the derivative. ,"{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+76,"
+",{}
+76,"In the example shown, ","{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+76,W,"{'foregroundColor': {'opaqueColor': {'rgbColor': {'red': 0.76862746, 'green': 0.46666667, 'blue': 0.21568628}}}, 'bold': True}"
+76, is a 3-tensor. The gradient of l wrt ,"{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+76,W,"{'foregroundColor': {'opaqueColor': {'rgbColor': {'red': 0.76862746, 'green': 0.46666667, 'blue': 0.21568628}}}, 'bold': True}"
+76, has the same shape as ,"{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+76,W,"{'foregroundColor': {'opaqueColor': {'rgbColor': {'red': 0.76862746, 'green': 0.46666667, 'blue': 0.21568628}}}, 'bold': True}"
+76,", and at element (i, j, k) it holds the scalar derivative of l wrt ","{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+76,W,"{'foregroundColor': {'opaqueColor': {'rgbColor': {'red': 0.76862746, 'green': 0.46666667, 'blue': 0.21568628}}}, 'bold': True}"
+76,ijk,{'baselineOffset': 'SUBSCRIPT'}
+76,.,"{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+76,"
+",{}
+76,"With these rules, we can use tensors of any shape and dimension and always have a well defined gradient.","{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+76,"
+",{}
+77,"The standard gradient notation isn’t very suitable for our purposes. It puts the loss front and center, but that will be the same for all our gradients. The object that we’re actually interested in is relegated to a subscript. Also, it isn’t very clear from the notation what the shape is of the tensor that we’re looking at. ","{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+77,"
+",{}
+77,"We can think of the nabla as an operator like a transposition taking an inverse. It turns a matrix into another matrix, a vector into another vector and so on.","{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+77,"
+",{}
+77,"For this reason, we’ll introduce a new notation. This isn’t standard, so don’t expect to see it anywhere else, but it will help to clarify our mathematics a lot as we go forward.","{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+77,"
+",{}
+77,"We’ve put the W front and center, so it’s clear that the result of taking the gradient is also a matrix, and we’ve remove the loss, since we’ve assume that we are always taking the gradient of the loss.","{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+77,"
+",{}
+77,"The notation works the same for vectors and even for scalars. When we refer to a single element of the gradient, we will follow our convention for matrices, and use the non-bold version of its letter.","{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+77,"
+",{}
+77,This is the gradient ,"{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+77,of,{'italic': True}
+77, ,"{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+77,l,"{'bold': False, 'fontFamily': 'Arial', 'weightedFontFamily': {'fontFamily': 'Arial', 'weight': 400}}"
+77,. Since ,"{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+77,l,"{'bold': False, 'fontFamily': 'Arial', 'weightedFontFamily': {'fontFamily': 'Arial', 'weight': 400}}"
+77," never changes, we’ll refer to this as “the gradient","{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+77, for,{'italic': True}
+77, ,"{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+77,W,"{'foregroundColor': {'opaqueColor': {'rgbColor': {'red': 0.76862746, 'green': 0.46666667, 'blue': 0.21568628}}}, 'bold': True}"
+77,”.,"{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+77,"
+",{}
+78,"Element (i, j) for the gradient of W is the same as the gradient for element (i, j) of W. ","{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+78,"
+",{}
+78,"To denote this element we follow the convention we have for elements of tensors, that we use the same letter as we use for the matrix, but non-bold.","{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+78,"
+",{}
+79,"This gives us a good way of thinking about the gradients, but we still don’t have a chain rule to base out back propagation on. ","{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+79,"
+",{}
+79,"The main trick we will use is to stick to scalar derivatives as much as possible. Once we have worked out the derivative in purely scalar terms, we will find a way to vectorize their computation.","{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+79,"
+",{}
+80,We start simple: what is the gradient for ,"{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+80,y,"{'foregroundColor': {'opaqueColor': {'rgbColor': {'red': 0.4, 'green': 0.30980393, 'blue': 0.5058824}}}, 'bold': True}"
+80,"? This is a vector, because ","{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+80,y,"{'foregroundColor': {'opaqueColor': {'rgbColor': {'red': 0.4, 'green': 0.30980393, 'blue': 0.5058824}}}, 'bold': True}"
+80, is a vector. Let’s first work out the derivative of the i-th element of ,"{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+80,y,"{'foregroundColor': {'opaqueColor': {'rgbColor': {'red': 0.4, 'green': 0.30980393, 'blue': 0.5058824}}}, 'bold': True}"
+80,. This is purely a scalar derivative so we can simply use the rules we already know. We get 2(,"{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+80,y,"{'foregroundColor': {'opaqueColor': {'rgbColor': {'red': 0.4, 'green': 0.30980393, 'blue': 0.5058824}}}}"
+80,i,{'baselineOffset': 'SUBSCRIPT'}
+80, - t,"{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+80,i,{'baselineOffset': 'SUBSCRIPT'}
+80,) for that particular derivative.,"{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+80,"
+",{}
+80,"Then, we just re-arrange all the derivatives for ","{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+80,y,"{'foregroundColor': {'opaqueColor': {'rgbColor': {'red': 0.4, 'green': 0.30980393, 'blue': 0.5058824}}}}"
+80,i,{'baselineOffset': 'SUBSCRIPT'}
+80," into a vector, which gives us the complete gradient for y.","{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+80,"
+",{}
+80,The final step requires a little creativity: we need to figure out how to compute this vector using only basic linear algebra operations on the given vectors and matrices. In this case it’s not so complicated: we get the gradient for ,"{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+80,y,"{'foregroundColor': {'opaqueColor': {'rgbColor': {'red': 0.4, 'green': 0.30980393, 'blue': 0.5058824}}}, 'bold': True}"
+80, by element-wise subtracting ,"{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+80,t,{'bold': True}
+80, from ,"{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+80,y,"{'foregroundColor': {'opaqueColor': {'rgbColor': {'red': 0.4, 'green': 0.30980393, 'blue': 0.5058824}}}, 'bold': True}"
+80, and multiplying by 2.,"{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+80,"
+",{}
+80,"We haven’t needed any chain rule yet, because our computation graph has only one edge.","{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+80,"
+",{}
+80,"
+","{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+81,Let’s move one step down and work out the gradients for ,"{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+81,V,"{'foregroundColor': {'opaqueColor': {'rgbColor': {'red': 0.76862746, 'green': 0.46666667, 'blue': 0.21568628}}}, 'bold': True}"
+81,. ,"{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+81,"
+",{}
+83,"Since this is an important principle to grasp, let’s keep going until we get to the other set of parameters, ","{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+83,W,"{'foregroundColor': {'opaqueColor': {'rgbColor': {'red': 0.76862746, 'green': 0.46666667, 'blue': 0.21568628}}}, 'bold': True}"
+83,. We’ll leave the biases as an exercise.,"{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+83,"
+",{}
+83,"Most of the derivation is the same as before. However, sin","{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+83,"
+",{}
+83,"
+","{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+84,"Now, at this point, when we analyze ","{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+84,k,"{'foregroundColor': {'opaqueColor': {'rgbColor': {'red': 0.48235294, 'green': 0.5803922, 'blue': 0.2784314}}}, 'bold': True}"
+84,", note that we already have the gradient over ","{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+84,h,"{'foregroundColor': {'opaqueColor': {'rgbColor': {'red': 0.23529412, 'green': 0.5372549, 'blue': 0.6156863}}}, 'bold': True}"
+84,. This means that we no longer have to apply the chain rule to anything above ,"{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+84,h,"{'foregroundColor': {'opaqueColor': {'rgbColor': {'red': 0.23529412, 'green': 0.5372549, 'blue': 0.6156863}}}, 'bold': True}"
+84,". We can draw this scalar computation graph, and work out the local gradient for ","{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+84,k,"{'foregroundColor': {'opaqueColor': {'rgbColor': {'red': 0.48235294, 'green': 0.5803922, 'blue': 0.2784314}}}, 'bold': True}"
+84, in terms for the gradient for ,"{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+84,h,"{'foregroundColor': {'opaqueColor': {'rgbColor': {'red': 0.23529412, 'green': 0.5372549, 'blue': 0.6156863}}}, 'bold': True}"
+84,.,"{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+84,"
+",{}
+84,"Given that, working out the gradient for ","{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+84,k,"{'foregroundColor': {'opaqueColor': {'rgbColor': {'red': 0.48235294, 'green': 0.5803922, 'blue': 0.2784314}}}, 'bold': True}"
+84," is relatively easy, since the operation from ","{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+84,k,"{'foregroundColor': {'opaqueColor': {'rgbColor': {'red': 0.48235294, 'green': 0.5803922, 'blue': 0.2784314}}}, 'bold': True}"
+84, to ,"{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+84,h,"{'foregroundColor': {'opaqueColor': {'rgbColor': {'red': 0.23529412, 'green': 0.5372549, 'blue': 0.6156863}}}, 'bold': True}"
+84, is an element-wise one.,"{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+84,"
+",{}
+85,"Finally, the gradient for ","{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+85,W,"{'foregroundColor': {'opaqueColor': {'rgbColor': {'red': 0.76862746, 'green': 0.46666667, 'blue': 0.21568628}}}, 'bold': True}"
+85,". The situation here is exactly the same as we saw earlier for V (matrix in, vector out, matrix multiplication), so we should expect the derivation to have the same form (and indeed it does).","{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+85,"
+",{}
+86,And here’s the backward pass that we just derived.,"{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+86,"
+",{}
+86,We’ve left the derivatives of the,"{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+86, ,"{'foregroundColor': {'opaqueColor': {'rgbColor': {'green': 0.42745098, 'blue': 0.64705884}}}}"
+86,bias parameters,"{'foregroundColor': {'opaqueColor': {'rgbColor': {'red': 0.24705882, 'green': 0.4, 'blue': 0.5882353}}}}"
+86, out. You’ll have to work these out to implement the first homework exercise.,"{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+86,"
+",{}
+86,(note that ’ cannot be part of a variable name in actual python. you’ll have to come up with some other name),"{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+86,"
+",{}
+89,"We’ve simplified the computation of derivatives a lot. All we’ve had to do is work out local derivatives and chain them together. We can go one step further: if we let the computer keep track of our computation, and provide some backwards functions for basic operations, the computer can work out the whole backpropagation algorithm for us. This is called","{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+89, automatic differentiation,{'bold': True}
+89, (or sometimes,"{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+89, autograd,{'bold': True}
+89,).,"{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+89,"
+",{}
+91,"This is what we want to achieve. We work out on pen and paper the local derivatives of various modules, and then we chain these modules together in a copmputation graph ","{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+91,in our code,{'italic': True}
+91,". The compute keep the graph in memory, and can automatically work out the backropagation.","{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+91,"
+",{}
+92,This kind of algorithm is called automatic differentiation. What we’ve been doing so far is called ,"{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+92,"backward, or ",{'bold': True}
+92,reverse mode,"{'bold': True, 'italic': True}"
+92, automatic differentiation,{'bold': True}
+92,". This is efficient if you have few output nodes. Note that if we had two output nodes, we’d need to do a separate backward pass for each.","{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+92,"
+",{}
+92,"If you have few inputs, it’s more efficient to start with the inputs and apply the chain rule working forward. This is called forward mode automatic differentiation.","{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+92,"
+",{}
+92,"Since we assume we only have one output node (where the gradient computation is concernced), we will always use reverse mode.","{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+92,"
+",{}
+94,"The basic datastructure of our system will be the tensor. A tensor is a generic name for family of datastructures that includes a scalar, a vectorm, a matrix and so on. ","{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+94,"
+",{}
+94,There is no good way to visualize a 4-dimensional structure. We will occasionally use this form to indicate that there is a fourth dimension along which we can index the tensor.,"{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+94,"
+",{}
+94,"We will assume that whatever data we work with (images, text, sounds), will in some way be encode into one or more tensors, before it is fed into our system. Let’s look at some examples. ","{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+94,"
+",{}
+95,"A simple dataset, with numeric features can simply be represented as a matrix. For the labels, we usually create a separate corresponding vector for the labels.","{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+95,"
+",{}
+95,Any categoric features or labels should be converted to numeric features (normally by one-hot coding).,"{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+95,"
+",{}
+96,"Images can be represented as 3-tensors. In an RGB image, the color of a single pixel is represented using three values between 0 and 1 (how red it is, how green it is and how blue it is). This means that an RGB image can be thought of as a stack of three color channels, represented by matrices.","{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+96,"
+",{}
+96,This stack forms a 3-tensor.,"{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+96,"
+",{}
+96,source: ,"{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+96,http://www.adsell.com/scanning101.html,"{'foregroundColor': {'opaqueColor': {'rgbColor': {'red': 0.011764706, 'green': 0.39607844, 'blue': 0.7529412}}}, 'bold': True, 'link': {'url': 'http://www.adsell.com/scanning101.html'}, 'underline': True}"
+96,"
+",{}
+97,"If we have a dataset of images, we can represent this as a 4-tensor, with dimensions indexing the instances, their width, their height and their color channels respectively. Below is a snippet of code showing that when you load the CIFAR10 image data in Keras, you do indeed get a 4-tensor like this.","{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+97,"
+",{}
+97,"There is no agreed standard ordering for the dimensions in a batch of images. Tensorfflow and Keras use (batch, height, width, channels), whereas Pytorch uses (batch, channels, height, width). ","{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+97,"
+",{}
+97,(You can remember the latter with the mnemonic “,"{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+97,bach,{'bold': True}
+97,elor ,"{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+97,ch,{'bold': True}
+97,o,"{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+97,w,{'bold': True}
+97,”.),"{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+97,"
+",{}
+98,"It’s important to realize that even though we think of tensors as multidimensional arrays, in memory, they are necessarily laid out as a single line of numbers. The Tensor object knows the shape that these numbers should take, and uses that to compute whatever we need it to compute.","{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+98,"
+",{}
+98,We can do this in two ways: scanning along the rows first and then the columns is called ,"{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+98,row-major ordering,{'bold': True}
+98,". This is what numpy and pytorch both do. The other option is (unsurprisingly) called column major ordering. In higher dimensional tensors, the dimensions further to the right are always scanned before the dimensions to their left.","{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+98,"
+",{}
+98,"Imagine looping over all elements in a tensor with shape (a, b, c, d) in four nested loops. If you want to loop over the elements in the order they are in memory, then the loop over d would be the innermost loop, then c, the b and then a.","{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+98,"
+",{}
+98,"This allows us to perform some operations very cheaply, ","{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+98,but we have to be careful,{'bold': True}
+98,.,"{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+98,"
+",{}
+99,"Here is one such cheap operation: a reshape. This changes the shape of the tensor, but not the data.","{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+99,"
+",{}
+99,"To do this cheaply, we can create a new tensor object with the same data as the old one, but with a different shape.","{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+99,"
+",{}
+101,"Imagine that we wanted to scale a dataset of images in such way that over the whole dataset, each color channel has a maximal value of 1 (independent of the other channels).","{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+101,"
+",{}
+101,"To do this, we need a 3-vector of the maxima per color channel. Pytorch only allows us to take the maximum in one direction, but we can reshape the array so that all the directions we’re not interested in are collapsed into one dimension.","{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+101,"
+",{}
+101,"Afterwards, we can reverse the reshape to get our image dataset back.","{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+101,"
+",{}
+101,"We have to be careful: the last three lines in this slide form a perfectly valid reshape, but the  ","{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+101,c dimension ,"{'foregroundColor': {'opaqueColor': {'rgbColor': {'red': 0.23529412, 'green': 0.5372549, 'blue': 0.6156863}}}}"
+101,in the result does,"{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+101, not,{'italic': True}
+101, contain our color values. ,"{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+101,"
+",{}
+101,"In general, you’re fine if you","{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+101, collapse dimensions that are next to each other,{'bold': True}
+101,", and uncollapse them ","{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+101,in the same order.,{'italic': True}
+101,"
+",{}
+102,"A transpose operation can also be achieved cheaply. In this case, we just keep a reference to the old tensor, and whenever a user requests the element (i, j) we return (j, i) from the original tensor.","{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+102,"
+",{}
+102,"NB: This isn’t precisely how pytorch does this, but the effect is the same: we get a transposed tensor in constant time, by viewing the same data in memory in a different way.","{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+102,"
+",{}
+103,Even slicing can be accomplished by referring to the original data.,"{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+103,"
+",{}
+104,"For some operations, however, the data needs to be contiguous. That is, the tensor data in memory needs to be one uninterrupted string of data in row major ordering with no gaps. If this isn’t the case, pytorch will throw an exception like this.","{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+104,"
+",{}
+104,You can fix this by calling ,"{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+104,.contiguous(),"{'bold': False, 'fontFamily': 'Arial', 'weightedFontFamily': {'fontFamily': 'Arial', 'weight': 400}}"
+104, on the tensor. The price you pay is the linear time and space complexity of copying the data.,"{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+104,"
+",{}
+106,"We’ll need to be a little mode precise in our notations. From now on we’ll draw computation graphs like this, making the operation explicit.","{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+106,"
+",{}
+106,(There doesn’t seem to be a standard notation. This will work for our purposes).,"{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+106,"
+",{}
+106,In tensorflow operations are called ,"{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+106,ops,{'italic': True}
+106,", and in pytorch they’re called ","{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+106,functions,{'italic': True}
+106,.,"{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+106,"
+",{}
+107,"As an example, here is our MLP expressed in our new notation. ","{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+107,"
+",{}
+107,"Just as before, it’s up to us how ","{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+107,granular,{'italic': True}
+107," we make the computation. We can wrap the whole computation of the loss in a single operation, but we can also separate the matrix multiplication by ","{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+107,the weights ,"{'foregroundColor': {'opaqueColor': {'rgbColor': {'red': 0.76862746, 'green': 0.46666667, 'blue': 0.21568628}}}}"
+107,and the addition of ,"{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+107,the bias vector,"{'foregroundColor': {'opaqueColor': {'rgbColor': {'red': 0.24705882, 'green': 0.4, 'blue': 0.5882353}}}}"
+107, into separate operations.,"{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+107,"
+",{}
+107,Note that the,"{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+107, granularity ,{'italic': True}
+107,"with which we represent a computation in a computation graph is up to us. We could, for instance also choose to combine the multiplication and the addition into a single operation. ","{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+107,"
+",{}
+107,"If there’s a uniform direction to the computation, we’ll leave out the arrowheads for clarity, but you should think of a computation graph as a directional one. All connections have a definite direction.","{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+107,"
+",{}
+108,We hold on to the same assumptions we had before. Without these two assumptions things would become a lot more complicated.,"{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+108,"
+",{}
+109,"To store a computation graph in memory, we need three objects.","{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+109,"
+",{}
+109,A TensorNode objects holds the tensorvalue at that node. It holds the gradient of the tensor at that node (to be filled by the backpropagation algorithm) and it holds a pointer to the Operation Node that produced it (which can be null for leaf nodes).,"{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+109,"
+",{}
+109,An OpNode object represents an instance of a particular ,"{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+109,"
+",{}
+110,We also need to implement the computation of the operation itself. This is done in two functions (these are usually class functions or static functions).,"{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+110,"
+",{}
+110,The function forward computes the outputs given the inputs (just like any function in any programming language).,"{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+110,"
+",{}
+110,The function backward takes the gradient for the outputs (the gradient of the loss wrt to the outputs) and produces the gradient for the inputs.,"{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+110,"
+",{}
+110,Both functions are also given a ,"{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+110,context,"{'bold': False, 'fontFamily': 'Arial', 'weightedFontFamily': {'fontFamily': 'Arial', 'weight': 400}}"
+110, object. This is a datastructure (a dictionary or a list) to which the forward can add any value which it needs to save for the backward.,"{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+110,"
+",{}
+110,Note that the backward function does not compute the local derivative: it computes the accumulated gradient of the loss over the inputs (given the accumulated gradient of the loss over the outputs).,"{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+110,"
+",{}
+111,"This is the algorithm for backpropagation in this setting. We chain together these modules into a computation graph, and perform a forward pass to compute a loss. We then walk backward from the loss node breadth-first to compute the gradients for each tensor node. Because we walk breadth first, we ensure that we’ve always computed the gradients for the outputs of each Operation node we encounter already, and we can simply call its backward to compute the gradients for its inputs.","{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+111,"
+",{}
+111,"Note the last point: some tensor nodes will be inputs to multiple operation nodes. By the multivariate chain rule, we should sum the gradients they get from all the OpNodes they feed into. We can achieve this easily by just initializing the gradients to zero and  adding the gradients we compute to any that are already there.","{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+111,"
+",{}
+112,There are two common strategies for constructing the computation graph: lazy and eager execution.,"{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+112,"
+",{}
+113,Here’s one example of how a lazy execution API might look.,"{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+113,"
+",{}
+113,"Note that when we’re building the graph, we’re not telling it which values to put at each node. We’re just defining the","{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+113, shape,{'italic': True}
+113," of the computation, but not performing the computation itself.","{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+113,"
+",{}
+113,"When we create the model, we define which nodes are the input nodes, and which node is the loss node. We then provide the input values and perform the forward and backward passes.","{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+113,"
+",{}
+114,"In lazy execution, which was the norm during the early years of deep learning, we build the computation graph, but we don’t yet specify the values on the tensor nodes. When the computation graph is finished, we define the data, and we feed it through.","{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+114,"
+",{}
+114,"This is fast since the deep lerning system can optimize the graph sturcture during compilation, but it makes models hard to debug: if something goes wrong during training, you probably made a mistake while defining you graph, but you will only get an while passing data through it. The resulting stack trace will never point to the part of your code where you made the mistake.","{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+114,"
+",{}
+115,"In eager mode deep learning systems, we create a node in our computation graph (a TensorNode) by specifying what data it should contain. The result is a tensor object that stores both the data, and the gradient over that data (which will be filled later).","{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+115,"
+",{}
+115,Here we create the variables ,"{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+115,a,"{'foregroundColor': {'opaqueColor': {'rgbColor': {'red': 0.76862746, 'green': 0.46666667, 'blue': 0.21568628}}}}"
+115, and ,"{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+115,b,"{'foregroundColor': {'opaqueColor': {'rgbColor': {'red': 0.48235294, 'green': 0.5803922, 'blue': 0.2784314}}}}"
+115,". If we now apply an operation to these, for instance to multiply their values, the result is another variable ","{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+115,c,"{'foregroundColor': {'opaqueColor': {'rgbColor': {'green': 0.42745098, 'blue': 0.64705884}}}}"
+115,. Languages like python allow us to ,"{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+115,overload,{'italic': True}
+115," the * operator it looks like we’re just computing multiplication, but behind the scenes, we are creating a computation graph that records all the computations we’ve done.","{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+115,"
+",{}
+115,We compute the data stored in ,"{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+115,c,"{'foregroundColor': {'opaqueColor': {'rgbColor': {'green': 0.42745098, 'blue': 0.64705884}}}}"
+115," by running the computation, bu we also store references to the variables that were used to create","{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+115, c,"{'foregroundColor': {'opaqueColor': {'rgbColor': {'green': 0.42745098, 'blue': 0.64705884}}}}"
+115,", and the operation that created it.","{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+115,"
+",{}
+115,"Using this graph, we can perform the back propagation from a given node that we designate as ","{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+115,the loss node,"{'foregroundColor': {'opaqueColor': {'rgbColor': {'red': 0.24705882, 'green': 0.4, 'blue': 0.5882353}}}}"
+115,. We work our way down the graph computing the derivative of each variable with respect to ,"{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+115,c,"{'foregroundColor': {'opaqueColor': {'rgbColor': {'green': 0.42745098, 'blue': 0.64705884}}}}"
+115,". At the start the TensorNodes do not have their grad’s filled in, but at the end of the backward, all gradients have been computed.","{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+115,"
+",{}
+116,"In eager execution, we simply execute all operations immediately on the data, and collect the computation graph on the fly. We then execute the backward and ditch the graph we’ve collected.","{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+116,"
+",{}
+116,"This makes debugging much easier, and allows for more flexibility in what we can do in the forward pass. It can, however be a little difficult to wrap your head around. Since we’ll be using pytorch later in the course, we’ll show you how eager execution works step by step.","{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+116,"
+",{}
+117,The final ingredient we need is a large collection of operations with backward functions worked out. We’ll show how to do this for a few examples.,"{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+117,"
+",{}
+117,"First, an operation that sums two matrices element-wise. ","{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+117,"
+",{}
+117,The recipe is the same as we saw in the last part: ,"{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+117,"
+",{}
+117,Write out the scalar derivative for a single element. ,"{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+117,"
+",{}
+117,Use the multivariate chain rule to sum over all outputs.,"{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+117,"
+",{}
+117,Vectorize the result.,"{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+117,"
+",{}
+117,"Note that when we drawe the computation graph, we can think of everything that happens between ","{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+117,S,"{'foregroundColor': {'opaqueColor': {'rgbColor': {'red': 0.76862746, 'green': 0.46666667, 'blue': 0.21568628}}}, 'bold': False, 'fontFamily': 'Arial', 'weightedFontFamily': {'fontFamily': 'Arial', 'weight': 400}}"
+117, and ,"{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+117,l,"{'bold': False, 'fontFamily': 'Arial', 'weightedFontFamily': {'fontFamily': 'Arial', 'weight': 400}}"
+117, as a single module: we are already given the gradient of ,"{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+117,l,"{'bold': False, 'fontFamily': 'Arial', 'weightedFontFamily': {'fontFamily': 'Arial', 'weight': 400}}"
+117, over ,"{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+117,S,"{'foregroundColor': {'opaqueColor': {'rgbColor': {'red': 0.76862746, 'green': 0.46666667, 'blue': 0.21568628}}}, 'bold': False, 'fontFamily': 'Arial', 'weightedFontFamily': {'fontFamily': 'Arial', 'weight': 400}}"
+117,", so it doesn’t matter if it’s one operation or a million. ","{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+117,"
+",{}
+117,"Again, we can draw the computation graph at any granularity we like: very fine individual operations like summing and multiplying or very coarse-grained operations like entire NNs. ","{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+117,"
+",{}
+117,"For this operation, the context object is not needed, we can perform the backward pass without remembering anything about the forward pass.","{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+117,"
+",{}
+118,"Most deep learning frameworks also have a way of combining model parameters and computation into a single unit, often called a","{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+118, module,{'bold': True}
+118, or a ,"{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+118,layer,{'bold': True}
+118,.,"{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+118,"
+",{}
+118,In this case a Linear module (as it is called in Pytorch) takes care of implementing the computation of a single layer of a neural network (sans activation) and of remembering the weights and the bias.,"{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+118,"
+",{}
+118,Modules have a ,"{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+118,forward ,"{'bold': True, 'italic': True}"
+118,"function which performs the computation of the layer, but they ","{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+118,don’t ,{'italic': True}
+118,have a ,"{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+118,backward,{'bold': True}
+118," function. They just chain together operations, and the backpropagation calls the backwards on the operations. In other words, it doesn’t matter to the backpropagation whether we use a module or apply all the operations by hand.","{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+118,"
+",{}
+119,"Whichcompletes the picture we wanted to create: a system where all we have to do is perform some computations on some tensors, just like we would do in ","{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+119,numpy,"{'bold': False, 'fontFamily': 'Arial', 'weightedFontFamily': {'fontFamily': 'Arial', 'weight': 400}}"
+119,", and all the building of computation graphs and all the backpropagating is handled for us automatically.","{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+119,"
+",{}
+121,"To finish up, we’ll show you the implementation of some more operations. You’ll be asked to do a few of these in the second homework exercise.","{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+121,"
+",{}
+122,"This is a pretty simple derivation, but it shows two things:","{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+122,"
+",{}
+122,"We can easily do a backward over functions that output high dimensional tensors, but we should sum over all dimensions of the output when we apply the multivariate chain rule.","{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+122,"
+",{}
+122,The backward function illustrates the utility of ,"{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+122,the context object,{'bold': True}
+122,". To work out the backward, we need to know the original input. We could just have stored that for every operation, but as we see here, we’ve done part of the computation already (an in other backwards the inputs ","{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+122,aren’t,{'italic': True}
+122," necessary). If we give the operation control over what information it wants to store for the backward pass, we are maximally flexible.","{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+122,"
+",{}
+123,"Note that the output is a vector, because we’ve summed out one dimension. Therefore, when we apply the multivariate chain rule, we sum over only one dimension.","{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+123,"
+",{}
+123,"This is a sum like the earlier example, so we don’t need to save any tensor values from the forward pass. However, we do need to remember the size of the dimension we summed out. Therefore, we use the context to store just one object.","{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+123,"
+",{}
+123,The ,"{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+123,expand,"{'bold': False, 'fontFamily': 'Arial', 'weightedFontFamily': {'fontFamily': 'Arial', 'weight': 400}}"
+123," function we use here is not available in numpy, but it does exist in pytorch. In numpy we can use ","{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+123,repeat,"{'bold': False, 'fontFamily': 'Arial', 'weightedFontFamily': {'fontFamily': 'Arial', 'weight': 400}}"
+123,.,"{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+123,"
+",{}
+124,"Our final example includes a constant argument. We take a scalar, and expand it to a matrix of the given size, filled with the value x.","{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+124,"
+",{}
+124,"In this case, we do not care about the gradient for size (and even if we did, integer values don’t yield meaningful gradients without some extra work). We consider this a constant.","{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+124,"
+",{}
+124,"This can be done in different ways. In pytorch, you return None for the gradient for a constant (as we’ve shown here). ","{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+124,"
+",{}
+124,"In our toy system (vugrad), we consider all ","{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+124,keyword arguments,{'italic': True}
+124, constants.,"{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+124,"
+",{}
+125,"If you want to force some part of your computation graph to be a constant, you can call detach on it (in pytorch,similar functionality exists in tensorflow). With this, you still get the forward computation, but the backpropagation will treat B as a constant. ","{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+125,"
+",{}
+125,This can be useful is settings where,"{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+125, gradient estimation,{'bold': True}
+125," is required, like in reinforcement learning. We will revisit this in the later lectures.","{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+125,"
+",{}
+127,So ,"{'bold': False, 'fontFamily': 'Calibri', 'fontSize': {'magnitude': 16, 'unit': 'PT'}, 'weightedFontFamily': {'fontFamily': 'Calibri', 'weight': 400}}"
+127,"
+",{}
